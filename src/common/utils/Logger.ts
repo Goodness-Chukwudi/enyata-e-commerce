@@ -1,6 +1,5 @@
 import { Response } from "express";
-import { ENVIRONMENTS } from "../constants/app_constants";
-import Env from "../configs/environment_config";
+import winston from "winston";
 
   /**
    * A Utility class that provides methods used for logging

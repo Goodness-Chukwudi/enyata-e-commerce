@@ -9,6 +9,7 @@ import { ENVIRONMENTS } from '../constants/app_constants';
 import Env from '../configs/environment_config';
 import {UploadApiResponse, v2 as cloudinary} from 'cloudinary';
 import Jimp from "jimp";
+import { Pool, PoolClient } from 'pg'
 
 class AppUtils extends BaseResponseHandler {
 
@@ -266,6 +267,22 @@ class AppUtils extends BaseResponseHandler {
                     reject(error);
                 });
         });
+    }
+
+    async connectToDb(): Promise<PoolClient> {
+
+        const pool = new Pool({
+            host: 'localhost',
+            user: 'database-user',
+            password: 'secretpassword!!',
+            database: 'database-name',
+            max: 1,
+            idleTimeoutMillis: 50000,
+            connectionTimeoutMillis: 10000,
+            port: 5334
+        })
+
+        return  await pool.connect();
     }
 }
 

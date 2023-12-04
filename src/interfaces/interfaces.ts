@@ -2,10 +2,33 @@ import joi, { Extension, Root } from "joi";
 import { IUser } from "../models/user";
 import { ILoginSession } from "../models/login_session";
 import { IUserPrivilege } from "../models/user_privilege";
+import { QueryResult } from "pg";
 
 export interface IResponseMessage {
     response_code: number;
     message: string;
+}
+
+export interface TransactionData {
+    condition?: string,
+    queryType?: "save"|"update",
+    name: string,
+    data: Record<string, any>
+}
+
+export interface TransactionResult {
+    name: string,
+    data: Record<string, any>[]
+}
+
+export interface TransactionResult {
+    name: string,
+    data: Record<string, any>[]
+}
+
+export interface MultipleSave {
+    fields: string[],
+    values: any[][]
 }
 
 export interface IServiceResponse {

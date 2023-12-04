@@ -1,18 +1,37 @@
-import mongoose from 'mongoose';
-import App from "./App";
+import App, {appInstance} from "./App";
 import {ENVIRONMENTS } from './common/constants/app_constants';
 import UserService from './services/UserService';
 import Env from './common/configs/environment_config';
 import { DbConfig } from './common/configs/app_config';
+import { Pool } from 'pg';
 
 //Initiate DB connection
+const pool = new Pool(DbConfig);
 
-mongoose.connect(Env.MONGODB_URI, DbConfig);
-mongoose.connection.on('disconnected', () => console.log("DB disconnected"));
-mongoose.connection.on('error', err => console.error('Unable to connect to MongoDB via Mongoose\n'+ err));
+pool.connect().then(async client => {
+  appInstance.setDbClient(client);
 
-mongoose.connection.once('open', async () => {
-  console.log('Connected to MongoDB via Mongoose');
+  const createTableText = `
+CREATE TABLE IF NOT EXISTS book(
+  id SERIAL PRIMARY KEY,
+  name VARCHAR (50),
+  author VARCHAR (50),
+  amount INT NOT NULL,
+  sold_out BOOLEAN DEFAULT true
+);
+
+CREATE TABLE IF NOT EXISTS app_user(
+  id SERIAL PRIMARY KEY,
+  name VARCHAR (50) NOT NULL,
+  email VARCHAR (50) NOT NULL,
+  age INT NOT NULL,
+  married BOOLEAN DEFAULT false
+);
+`
+// create our temp table
+// await client.query(createTableText)
+
+// console.log(res.rows)
 
   //Create app default user on successful connection
   //this is the super admin user
@@ -23,6 +42,8 @@ mongoose.connection.once('open', async () => {
   App.listen(Env.PORT, () => {
     if (Env.ENVIRONMENT == ENVIRONMENTS.DEV) console.log(`Express is listening at http://localhost:${Env.PORT}${Env.API_PATH}`);
   });
+}).catch(error => {
+  console.log(error)
 });
 
 

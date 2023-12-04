@@ -9,10 +9,12 @@ import fileUpload from "express-fileupload";
 import Env from "./common/configs/environment_config";
 import UtilityValidator from "./middlewares/validators/UtilityValidator";
 import { DEFAULT_API_RESPONSE } from "./common/constants/app_constants";
+import { PoolClient } from "pg";
 
 class App {
 
     public app: Express;
+    public dbClient: PoolClient;
     private authMiddleware: AuthMiddleware;
     private utilityValidator: UtilityValidator;
 
@@ -20,6 +22,10 @@ class App {
       this.app = express();
       this.plugInMiddlewares();
       this.plugInRoutes();
+    }
+
+    setDbClient(client: PoolClient) {
+      this.dbClient = client;
     }
 
     private plugInMiddlewares() {
@@ -69,5 +75,6 @@ class App {
       
     }
 }
-
-export default new App().app;
+const appInstance = new App();
+export default appInstance.app;
+export {appInstance};

@@ -9,10 +9,14 @@ const JoiValidatorOptions = {
 };
 
 const DbConfig = {
-  dbName: "mainstack-test",
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  maxPoolSize: 100
+  host: 'localhost',
+  user: 'enyata-user',
+  password: 'password',
+  database: 'enyata-e-ecommerce',
+  max: 1,
+  idleTimeoutMillis: 50000,
+  connectionTimeoutMillis: 10000,
+  port: 5432
 };
 
 export {
