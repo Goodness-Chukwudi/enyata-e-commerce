@@ -2,18 +2,18 @@ import DBService from './DBService';
 import AppUtils from '../common/utils/AppUtils';
 import { OTP_STATUS, OTP_VALIDITY_PERIOD } from '../common/constants/app_constants';
 import PasswordService from './PasswordService';
-import OTP, { IOTP } from '../models/otp';
+import OTP, { otp_table } from '../models/otp';
 import { ClientSession } from 'mongoose';
 import DateUtils from '../common/utils/DateUtils';
 
-class OtpService extends DBService<IOTP> {
+class OtpService extends DBService<OTP> {
     
     passwordService: PasswordService;
     appUtils: AppUtils;
     dateUtils: DateUtils;
 
-    constructor(populatedFields:string[]|Record<string,string>[] = []) {
-        super(OTP, populatedFields);
+    constructor() {
+        super(otp_table);
 
         this.passwordService = new PasswordService();
         this.appUtils = new AppUtils();

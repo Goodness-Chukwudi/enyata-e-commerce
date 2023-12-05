@@ -1,6 +1,6 @@
 import { Request, Router, Response } from "express";
-import { IUser } from "../models/user";
-import { ILoginSession } from "../models/login_session";
+import User from "../models/user";
+import LoginSession from "../models/login_session";
 
 class RequestService {
 
@@ -40,14 +40,14 @@ class RequestService {
     /**
      * Return an object containing details of the logged in user.
     */
-    getLoggedInUser(): IUser {
+    getLoggedInUser(): User {
         return this.response.locals.user;
     }
 
     /**
      * Return an object containing details of the logged in session.
     */
-    getLoginSession(): ILoginSession {
+    getLoginSession(): LoginSession {
         return this.response.locals.login_session;
     }
 }

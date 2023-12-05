@@ -1,10 +1,10 @@
 import DBService from './DBService';
-import UserPassword, { IUserPassword } from '../models/user_password';
+import UserPassword, { user_password_table } from '../models/user_password';
 
-class PasswordService extends DBService<IUserPassword> {
+class PasswordService extends DBService<UserPassword> {
 
-    constructor(populatedFields:string[]|Record<string,string>[] = []) {
-        super(UserPassword, populatedFields);
+    constructor() {
+        super(user_password_table);
     }
 }
 

@@ -9,7 +9,8 @@ import { ENVIRONMENTS } from '../constants/app_constants';
 import Env from '../configs/environment_config';
 import {UploadApiResponse, v2 as cloudinary} from 'cloudinary';
 import Jimp from "jimp";
-import { Pool, PoolClient } from 'pg'
+import table_create_queries from '../configs/db_table_create_queries';
+import { PoolClient } from 'pg';
 
 class AppUtils extends BaseResponseHandler {
 
@@ -269,21 +270,23 @@ class AppUtils extends BaseResponseHandler {
         });
     }
 
-    async connectToDb(): Promise<PoolClient> {
-
-        const pool = new Pool({
-            host: 'localhost',
-            user: 'database-user',
-            password: 'secretpassword!!',
-            database: 'database-name',
-            max: 1,
-            idleTimeoutMillis: 50000,
-            connectionTimeoutMillis: 10000,
-            port: 5334
-        })
-
-        return  await pool.connect();
-    }
+    /**
+     * Creates db tables using the specified queries
+     * @returns  promise of void
+    */
+        public createDbTables(client: PoolClient): Promise<any> {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const response = await client.query(table_create_queries);
+                    
+                    resolve(response);
+                } catch (error) {
+                    reject (error);
+                } finally {
+                    client.release();
+                }
+            })
+        }
 }
 
 export default AppUtils;

@@ -1,10 +1,10 @@
-import LoginSession, {ILoginSession} from '../models/login_session';
+import LoginSession, {login_session_table} from '../models/login_session';
 import DBService from './DBService';
 
-class LoginSessionService extends DBService<ILoginSession> {
+class LoginSessionService extends DBService<LoginSession> {
 
-    constructor(populatedFields:string[]|Record<string,string>[] = []) {
-        super(LoginSession, populatedFields);
+    constructor() {
+        super(login_session_table,);
         
     }
 

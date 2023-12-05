@@ -22,7 +22,13 @@ export const USER_STATUS = Object.freeze({
     SUSPENDED: 'suspended',
     DEACTIVATED: 'deactivated',
     HIDDEN: 'hidden'
-})
+});
+
+export const GENDER = Object.freeze({
+    MALE: "male",
+    FEMALE: "female",
+    NOT_SAY: "I will rather not say"
+});
 
 export const ITEM_STATUS = Object.freeze({
     OPEN: 'open',
