@@ -4,6 +4,7 @@ import UserService from './services/UserService';
 import Env from './common/configs/environment_config';
 import { DbConfig } from './common/configs/app_config';
 import { Pool } from 'pg';
+import User, { user_table } from "./models/user";
 
 //Initiate DB connection
 const pool = new Pool(DbConfig);
@@ -29,15 +30,43 @@ CREATE TABLE IF NOT EXISTS app_user(
 );
 `
 // create our temp table
-// await client.query(createTableText)
+await client.query(createTableText)
 
 // console.log(res.rows)
 
   //Create app default user on successful connection
   //this is the super admin user
   //This happens only if there's no existing super admin user
-  // const userService = new UserService();
-  // await userService.createSuperAdmin();
+  const userService = new UserService();
+
+  const userData = {
+    name: "John Doe",
+    email: "johndoe@gmail.com",
+    age: 23,
+    married: false
+  }
+
+  const bookData = {
+    name: "Peter Obi",
+    author: "Emeka",
+    amount: 5000,
+    sold_out: true
+  }
+
+  const transData = [
+    {
+      name: user_table,
+      data: userData
+    },
+    {
+      name: "book",
+      data: bookData
+    },
+]
+
+  const res = await userService.updateOne({name: "John Emeka Doe"}, "id=2 AND email='johndoe@gmail.com'");
+
+  console.log(res)
 
   App.listen(Env.PORT, () => {
     if (Env.ENVIRONMENT == ENVIRONMENTS.DEV) console.log(`Express is listening at http://localhost:${Env.PORT}${Env.API_PATH}`);

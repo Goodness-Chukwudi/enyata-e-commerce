@@ -1,15 +1,15 @@
 import DBService from './DBService';
-import User, { IUser } from '../models/user';
+import User, { user_table } from '../models/user';
 import EmailService from '../common/utils/EmailService';
 import EmailTemplateUtils from '../common/utils/EmailTemplateUtils';
 
-class UserService extends DBService<IUser> {
+class UserService extends DBService<User> {
     
     emailService: EmailService;
     emailTemplateUtils: EmailTemplateUtils;
 
-    constructor(populatedFields:string[]|Record<string,string>[] = []) {
-        super(User, populatedFields);
+    constructor() {
+        super(user_table);
     }
 
     async sendLoginOTP(user: IUser, otp: string) {

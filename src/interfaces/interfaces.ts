@@ -13,22 +13,12 @@ export interface TransactionData {
     condition?: string,
     queryType?: "save"|"update",
     name: string,
+    data: Record<string, string|boolean|number>
+}
+
+export interface TransactionResult {
+    name: string,
     data: Record<string, any>
-}
-
-export interface TransactionResult {
-    name: string,
-    data: Record<string, any>[]
-}
-
-export interface TransactionResult {
-    name: string,
-    data: Record<string, any>[]
-}
-
-export interface MultipleSave {
-    fields: string[],
-    values: any[][]
 }
 
 export interface IServiceResponse {
