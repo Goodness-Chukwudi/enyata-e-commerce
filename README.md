@@ -14,6 +14,7 @@ The following items are required in your environment to run this application:
 - Environment variables
 
 Below is a list of the variables needed in your .env file
+
     ENVIRONMENT
     PORT
     ALLOWED_ORIGINS
