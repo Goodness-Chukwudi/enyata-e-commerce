@@ -286,9 +286,10 @@ class AppUtils extends BaseResponseHandler {
     async commitDbTransaction(client: PoolClient): Promise<void>{
         try {
             await client.query('COMMIT');
-            client.release();
         } catch (error) {
             throw error;
+        } finally {
+            client.release();
         }
     }
 
@@ -299,9 +300,10 @@ class AppUtils extends BaseResponseHandler {
     async rollBackDbTransaction(client: PoolClient): Promise<void>{
         try {
             await client.query('ROLLBACK');
-            client.release();
         } catch (error) {
             throw error;
+        } finally {
+            client.release();
         }
     }
 

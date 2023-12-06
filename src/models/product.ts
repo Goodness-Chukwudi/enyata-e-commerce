@@ -1,3 +1,4 @@
+import User from "./user";
 
 interface Product {
     id?: number,
@@ -6,7 +7,7 @@ interface Product {
     description: string,
     available_quantity: number,
     status: string,
-    created_by: string,
+    created_by: number|User,
     created_at: Date
 }
 

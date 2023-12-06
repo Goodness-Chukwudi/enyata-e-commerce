@@ -59,6 +59,7 @@ abstract class BaseResponseHandler {
     protected async sendSuccessResponse(res: Response, data:any = null, transaction?: PoolClient, statusCode = 200) {
         if (transaction) {
             await transaction.query('COMMIT');
+            transaction.release();
         }
         const response = {
             success: true,

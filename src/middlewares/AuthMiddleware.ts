@@ -84,6 +84,17 @@ export class AuthMiddleware extends BaseRouterMiddleware {
         }
     }
 
+    public validateAdminPrivilege = (req: Request, res: Response, next: any) => {
+        const user = this.requestService.getLoggedInUser();
+
+        if (user.is_admin) {
+            next();
+        } else {
+            const error = new Error("Invalid permission. Only an admin is allowed");
+            this.sendErrorResponse(res, error, this.errorResponseMessage.INVALID_PERMISSION, 403)
+        }
+    }
+
     private checkUserStatus(req:Request, res: Response, next:NextFunction) {
         const user = this.requestService.getLoggedInUser();
         const reqUrl = Env.API_PATH + req.url;

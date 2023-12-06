@@ -170,7 +170,7 @@ abstract class DBService<T> {
                 const GROUP_BY = groupBy ? "GROUP BY " + groupBy : "";
                 const HAVING = having ? "HAVING " + having : "";
                 const ORDER_BY = sort || "ORDER BY created_at DESC";
-                const LIMIT = `LIMIT ${pageSize} OFFSET ${page}`;
+                const LIMIT = page && pageSize ? `LIMIT ${pageSize} OFFSET ${(page -1)*pageSize}` : "";
                 
                 const queryText = `
                     SELECT ${fields}

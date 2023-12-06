@@ -101,6 +101,27 @@ class AppValidator extends BaseRouterMiddleware {
             return this.sendErrorResponse(res, error, this.errorResponseMessage.badRequestError(error.message), 400);
         }
     };
+
+
+    validateOrder = async ( req: Request, res: Response, next: NextFunction ) => {
+        try {
+            const body = req.body;
+            const BodySchema = Joi.object({
+                items: Joi.array().items(
+                    Joi.object({
+                        product: Joi.number().integer().min(1).required(),
+                        quantity: Joi.number().integer().min(1).required()
+                    })
+                ).unique("product").min(1).max(20).required()
+            });
+            
+            await BodySchema.validateAsync(body, JoiValidatorOptions);
+
+            next();
+        } catch (error: any) {
+            return this.sendErrorResponse(res, error, this.errorResponseMessage.badRequestError(error.message), 400);
+        }
+    };
 }
 
 export default AppValidator;

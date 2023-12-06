@@ -170,7 +170,6 @@ class UserMiddleware extends BaseRouterMiddleware {
                     const error = new Error("Invalid user id provided");
                     return this.sendErrorResponse(res, error, this.errorResponseMessage.INVALID_OTP, 400);
                 }
-                console.log("BEFORE VALID")
                 const isValid = await this.otpService.validateOTP(userId, otp);
                 if (isValid) {
                     this.requestService.addDataToState(USER_LABEL, user);

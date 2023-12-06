@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS login_sessions(
 CREATE TABLE IF NOT EXISTS products(
     id SERIAL PRIMARY KEY,
     name VARCHAR (100) NOT NULL UNIQUE,
-    price NUMERIC NOT NULL,
+    price REAL NOT NULL,
     description VARCHAR (255),
     available_quantity INT NOT NULL,
     status VARCHAR (50) DEFAULT 'active',
@@ -80,5 +80,36 @@ CREATE TABLE IF NOT EXISTS products(
     FOREIGN KEY(created_by) REFERENCES app_users(id)
 );
 `
+//ORDERS
++
+`
+CREATE TABLE IF NOT EXISTS orders(
+    id SERIAL PRIMARY KEY,
+    code VARCHAR (255) NOT NULL UNIQUE,
+    customer_name VARCHAR (255) NOT NULL,
+    customer_id INT NOT NULL,
+    amount REAL NOT NULL,
+    status VARCHAR (50) DEFAULT 'active',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(customer_id) REFERENCES app_users(id)
+);
+`
 
+//ORDER_PRODUCTS
++
+`
+CREATE TABLE IF NOT EXISTS order_products(
+    id SERIAL PRIMARY KEY,
+    name VARCHAR (100) NOT NULL,
+    price REAL NOT NULL,
+    quantity INT NOT NULL,
+    order_code VARCHAR (255) NOT NULL,
+    product_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(order_code) REFERENCES orders(code),
+    FOREIGN KEY(product_id) REFERENCES products(id),
+    FOREIGN KEY(customer_id) REFERENCES app_users(id)
+);
+`
 export default table_create_queries;

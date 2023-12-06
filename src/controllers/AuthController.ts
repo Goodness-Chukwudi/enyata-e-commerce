@@ -58,7 +58,6 @@ class AuthController extends BaseApiController {
                 }
 
                 const user = await this.userService.save(userData, transaction);
-                console.log(user)
 
                 const passwordData = {
                     password: body.password,
@@ -77,7 +76,6 @@ class AuthController extends BaseApiController {
 
                 this.sendSuccessResponse(res, response, transaction, 201);
             } catch (error: any) {
-                console.log(error.message)
                 this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, transaction);
             }
         });
@@ -226,18 +224,19 @@ class AuthController extends BaseApiController {
                     user_id: user.id!
                 }
                 await this.passwordService.save(password, transaction);
-
+                
                 //Deactivate old password
                 const query = {
                     condition: "id=$1",
                     values: [previousPassword.id]
                 }
-                await this.passwordService.updateOne(query, {status: PASSWORD_STATUS.DEACTIVATED});
+                await this.passwordService.updateOne(query, {status: PASSWORD_STATUS.DEACTIVATED}, transaction);
 
                 await this.appUtils.commitDbTransaction(transaction);
                 next()
             } catch (error: any) {
-                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, transaction);
+                await this.appUtils.rollBackDbTransaction(transaction);
+                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500);
             }
         });
 

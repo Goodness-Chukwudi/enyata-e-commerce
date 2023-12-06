@@ -9,6 +9,7 @@ import fileUpload from "express-fileupload";
 import Env from "./common/configs/environment_config";
 import UtilityValidator from "./middlewares/validators/UtilityValidator";
 import { DEFAULT_API_RESPONSE } from "./common/constants/app_constants";
+import AdminRoutes from "./routes/AdminRoutes";
 class App {
 
     public app: Express;
@@ -35,6 +36,7 @@ class App {
 
     private plugInRoutes() {
       const appRoutes = new AppRoutes(this.app);
+      const adminRoutes = new AdminRoutes(this.app);
     
       this.app.get("/", (req, res) => {
         res.status(200).send(DEFAULT_API_RESPONSE);
@@ -59,6 +61,7 @@ class App {
       //Initialize other routes
       //These routes are protected by the auth guard
       appRoutes.initializeRoutes();
+      adminRoutes.initializeRoutes();
 
       //return a 404 for unspecified/unmatched routes
       this.app.all("*", (req, res) => {
