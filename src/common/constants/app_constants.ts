@@ -2,6 +2,7 @@ export const USER_LABEL = "user";
 export const OTP_LABEL = "otp";
 export const USER_PASSWORD_LABEL = "user_password";
 export const LOGIN_SESSION_LABEL = "login_session";
+export const LOGIN_SESSION_VALIDITY = 86400000;
 export const OTP_VALIDITY_PERIOD = 5;
 export const UPLOADED_FILE = "uploaded_file";
 
@@ -18,7 +19,6 @@ export const USER_STATUS = Object.freeze({
     PENDING: 'pending',
     ACTIVE: 'active',
     SELF_DEACTIVATED: 'self_deactivated',
-    DELETED: 'deleted',
     SUSPENDED: 'suspended',
     DEACTIVATED: 'deactivated',
     HIDDEN: 'hidden'
@@ -79,4 +79,13 @@ export const ENVIRONMENTS = Object.freeze({
     DEV: "development",
     UAT: "user acceptance testing",
     STAGING: "staging"
+});
+
+
+export const PRODUCT_STATUS = Object.freeze({
+    ACTIVE: "active",
+    DEACTIVATED: "deactivated",
+    SUSPENDED: "suspended",
+    BANNED: "banned",
+    DELETED: "deleted"
 });

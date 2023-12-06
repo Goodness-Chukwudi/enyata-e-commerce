@@ -1,7 +1,8 @@
+import User from "./user";
 
 interface LoginSession {
-    id?: string,
-    user_id: number,
+    id?: number,
+    user_id: number|User,
     status: number,
     validity_end_date: Date,
     logged_out: boolean,

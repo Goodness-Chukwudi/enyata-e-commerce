@@ -11,6 +11,7 @@ const table_create_queries =
         phone VARCHAR (100) UNIQUE NOT NULL,
         gender VARCHAR (50) NOT NULL,
         require_new_password BOOLEAN DEFAULT false,
+        is_admin BOOLEAN DEFAULT false,
         status VARCHAR (50) DEFAULT 'pending',
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -42,7 +43,7 @@ CREATE TABLE IF NOT EXISTS user_passwords(
 `
 CREATE TABLE IF NOT EXISTS otps(
     id SERIAL PRIMARY KEY,
-    code VARCHAR (50) NOT NULL,
+    code VARCHAR (255) NOT NULL,
     type VARCHAR (50) NOT NULL,
     user_id INT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -53,7 +54,7 @@ CREATE TABLE IF NOT EXISTS otps(
 //LOGIN_SESSIONS
 +
 `
-CREATE TABLE IF NOT EXISTS otps(
+CREATE TABLE IF NOT EXISTS login_sessions(
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL,
     status VARCHAR (50) DEFAULT 'active',
@@ -62,6 +63,21 @@ CREATE TABLE IF NOT EXISTS otps(
     expired BOOLEAN DEFAULT false,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES app_users(id)
+);
+`
+//PRODUCTS
++
+`
+CREATE TABLE IF NOT EXISTS products(
+    id SERIAL PRIMARY KEY,
+    name VARCHAR (100) NOT NULL UNIQUE,
+    price NUMERIC NOT NULL,
+    description VARCHAR (255),
+    available_quantity INT NOT NULL,
+    status VARCHAR (50) DEFAULT 'active',
+    created_by INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(created_by) REFERENCES app_users(id)
 );
 `
 

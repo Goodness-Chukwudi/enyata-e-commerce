@@ -1,5 +1,6 @@
-import { BIT, PASSWORD_STATUS, USER_PASSWORD_LABEL } from "../common/constants/app_constants";
+import { BIT, LOGIN_SESSION_VALIDITY, PASSWORD_STATUS, USER_PASSWORD_LABEL } from "../common/constants/app_constants";
 import AppValidator from "../middlewares/validators/AppValidator";
+import UserPassword from "../models/user_password";
 import LoginSessionService from "../services/LoginSessionService";
 import PasswordService from "../services/PasswordService";
 import UserService from "../services/UserService";
@@ -48,14 +49,20 @@ class AppController extends BaseApiController {
             try {
                 const activeLoginSession = this.requestService.getLoginSession();
     
-                if (activeLoginSession.validity_end_date > new Date()) {
-                    activeLoginSession.logged_out = true;
-                    activeLoginSession.validity_end_date = new Date();
-                } else {
-                    activeLoginSession.expired = true
+                const query = {
+                    condition: "id=$1",
+                    values: [activeLoginSession.id]
                 }
-                activeLoginSession.status = BIT.OFF;
-                await activeLoginSession.save();
+                const update:Record<string, any> = {}
+                
+                if (activeLoginSession.validity_end_date > new Date()) {
+                    update.logged_out = true;
+                    update.validity_end_date = new Date();
+                } else {
+                    update.expired = true
+                }
+                update.status = BIT.OFF;
+                await this.loginSessionService.updateOne(query, update);
 
                 this.sendSuccessResponse(res);
             } catch (error: any) {
@@ -73,24 +80,28 @@ class AppController extends BaseApiController {
         );
 
         this.router.patch(path, async (req, res, next) => {
-            const session = await this.appUtils.createMongooseTransaction();
+            const transaction = await this.appUtils.startDbTransaction();
             try {
                 const loggedInUser = this.requestService.getLoggedInUser();
-                const previousPassword = this.requestService.getDataFromState(USER_PASSWORD_LABEL);
+                const previousPassword:UserPassword = this.requestService.getDataFromState(USER_PASSWORD_LABEL);
 
                 const passwordData = {
                     password: req.body.password,
                     email: loggedInUser.email,
-                    user: loggedInUser._id
+                    user_id: loggedInUser.id!
                 }
-                await this.passwordService.save(passwordData, session);
+                await this.passwordService.save(passwordData, transaction);
                 //Deactivate old password
-                await this.passwordService.updateById(previousPassword._id, {status: PASSWORD_STATUS.DEACTIVATED});
+                const query = {
+                    condition: "id=$1",
+                    values: [previousPassword.id]
+                }
+                await this.passwordService.updateOne(query, {status: PASSWORD_STATUS.DEACTIVATED});
 
-                await session.commitTransaction();
+                await this.appUtils.commitDbTransaction(transaction);
                 next();
             } catch (error:any) {
-                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, session) 
+                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, transaction) 
             }
         });
 
@@ -100,11 +111,12 @@ class AppController extends BaseApiController {
                 const user = this.requestService.getLoggedInUser();
     
                 const loginSessionData = {
-                    user: user._id,
-                    status: BIT.ON
+                    user_id: user.id!,
+                    status: BIT.ON,
+                    validity_end_date: new Date(Date.now() + LOGIN_SESSION_VALIDITY)
                 };
                 const loginSession = await this.loginSessionService.save(loginSessionData);
-                const token = this.appUtils.createAuthToken(user._id, loginSession._id);
+                const token = this.appUtils.createAuthToken(user.id!, loginSession.id!);
                 const response = {
                     message: this.successResponseMessage.PASSWORD_UPDATE_SUCCESSFUL,
                     token: token

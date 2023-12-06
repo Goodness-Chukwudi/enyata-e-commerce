@@ -29,6 +29,7 @@ abstract class BaseRouterMiddleware extends BaseResponseHandler {
         this.userService = new UserService();
         this.requestService = new RequestService(this.router);
         this.initServices();
+
     }
 
     protected abstract initServices():void;

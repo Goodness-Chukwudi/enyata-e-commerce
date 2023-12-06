@@ -6,6 +6,7 @@ import { BIT, LOGIN_SESSION_LABEL } from "../common/constants/app_constants";
 import LoginSessionService from "../services/LoginSessionService";
 import { TokenExpiredError } from "jsonwebtoken";
 import Env from "../common/configs/environment_config";
+import { user_table } from "../models/user";
 
 export class AuthMiddleware extends BaseRouterMiddleware {
 
@@ -18,26 +19,32 @@ export class AuthMiddleware extends BaseRouterMiddleware {
 
     protected initServices() {
         this.appUtils = new AppUtils();
-        this.loginSessionService = new LoginSessionService(["user"]);
+        this.loginSessionService = new LoginSessionService();
     }
 
     public authGuard = (req: Request, res: Response, next: any) => {
         
         const jwt = this.appUtils.getTokenFromRequest(req);
-        
+
         this.appUtils.verifyToken(jwt, async (error, decoded) => {
             try {
                 if (error) {
                     if (error instanceof TokenExpiredError)
                         return this.sendErrorResponse(res, error, this.errorResponseMessage.SESSION_EXPIRED, 401);
-    
+                        
                     return this.sendErrorResponse(res, error, this.errorResponseMessage.INVALID_TOKEN, 401);
                 } else {
                     const data = decoded.data || {};
-                    const query = {_id: data.loginSession, user: data.user, status: BIT.ON };
-                    const loginSession = await this.loginSessionService.findOneAndPopulate(query);
-                    if (loginSession?._id) {                
-                        const user = loginSession.user;
+
+                    const query = {
+                        condition: "id=$1 AND user_id=$2 AND status=$3",
+                        values: [data.loginSession, data.user, BIT.ON]
+                    };
+
+                    const loginSession = await this.loginSessionService.findOne(query);
+                    if (loginSession?.id) {   
+                        //@ts-ignore             
+                        const user = await this.userService.findById(loginSession.user_id);
     
                         await this.validateLoginSession(loginSession, req, res);
     
@@ -59,20 +66,26 @@ export class AuthMiddleware extends BaseRouterMiddleware {
     private async validateLoginSession(loginSession: any, req: Request, res: Response): Promise<void> {
         try {
             if (loginSession.validity_end_date <= new Date()) {
-                loginSession.expired = true;
-                loginSession.status = BIT.OFF;
-                await loginSession.save();
+                const query = {
+                    condition: "id=$1",
+                    values: [loginSession.id]
+                }
+                const update:Record<string, any> = {}
+
+                update.expired = true;
+                update.status = BIT.OFF;
+
+                await this.loginSessionService.updateOne(query, update);
                 const error = new Error("Session expired");
                 return this.sendErrorResponse(res, error, this.errorResponseMessage.SESSION_EXPIRED, 401);
             }
-            
         } catch (error) {
             throw error;
         }
     }
 
     private checkUserStatus(req:Request, res: Response, next:NextFunction) {
-        const user: any = this.requestService.getDataFromState(USER_LABEL) || {};
+        const user = this.requestService.getLoggedInUser();
         const reqUrl = Env.API_PATH + req.url;
         //Ignore user status validation on the routes below if the status is pending or requires new password
         const canIgnoreStatus = 

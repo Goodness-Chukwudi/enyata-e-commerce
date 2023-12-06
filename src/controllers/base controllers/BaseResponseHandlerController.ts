@@ -5,6 +5,7 @@ import { IResponseMessage } from "../../interfaces/interfaces";
 import ErrorResponseMessage from "../../common/constants/error_response_message";
 import SuccessResponseMessage from "../../common/constants/success_response_message";
 import { ErrorResponseData } from "../../interfaces/types";
+import { PoolClient } from "pg";
 
 abstract class BaseResponseHandler {
 
@@ -28,9 +29,11 @@ abstract class BaseResponseHandler {
      * @param session An optional mongoose client session, required to abort a running database transaction if any
      * @returns  void
     */
-    protected async sendErrorResponse( res: Response, err: Error, responseMessage: IResponseMessage, statusCode: number, session?: ClientSession, data:ErrorResponseData = undefined) {
+    protected async sendErrorResponse( res: Response, err: Error, responseMessage: IResponseMessage, statusCode: number, transaction?: PoolClient, data:ErrorResponseData = undefined) {
 
-        if(session) await session.abortTransaction();
+        if(transaction) {
+            await transaction.query('ROLLBACK');
+        }
 
         const response = {
             message: responseMessage.message,
@@ -53,8 +56,10 @@ abstract class BaseResponseHandler {
      * @param statusCode HTTP status code of the success response
      * @returns  void
     */
-    protected async sendSuccessResponse(res: Response, data:any = null, session?: ClientSession, statusCode = 200) {
-        if (session) await session.commitTransaction();
+    protected async sendSuccessResponse(res: Response, data:any = null, transaction?: PoolClient, statusCode = 200) {
+        if (transaction) {
+            await transaction.query('COMMIT');
+        }
         const response = {
             success: true,
             data: data

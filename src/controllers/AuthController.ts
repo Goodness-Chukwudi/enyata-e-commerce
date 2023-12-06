@@ -1,9 +1,10 @@
 import BaseApiController from "./base controllers/BaseApiController";
 import LoginSessionService from "../services/LoginSessionService";
-import { BIT, OTP_TYPES, PASSWORD_STATUS, USER_PASSWORD_LABEL, USER_STATUS } from "../common/constants/app_constants";
+import { BIT, LOGIN_SESSION_VALIDITY, OTP_TYPES, PASSWORD_STATUS, USER_PASSWORD_LABEL, USER_STATUS } from "../common/constants/app_constants";
 import PasswordService from "../services/PasswordService";
 import AppValidator from "../middlewares/validators/AppValidator";
 import OtpService from "../services/OtpService";
+import UserPassword from "../models/user_password";
 
 class AuthController extends BaseApiController {
 
@@ -40,35 +41,44 @@ class AuthController extends BaseApiController {
         this.router.post(path, this.appValidator.validateSignup);
         this.router.post(path, this.userMiddleWare.hashNewPassword);
         this.router.post(path, async (req, res) => {
-            const session = await this.appUtils.createMongooseTransaction();
+
+            const transaction = await this.appUtils.startDbTransaction();
+            
             try {
                 const body = req.body;
+
                 const userData = {
-                    username: body.username,
+                    first_name: body.first_name,
+                    last_name: body.last_name,
+                    middle_name: body.middle_name,
                     email: body.email,
                     phone: body.phone,
+                    gender: body.gender
+
                 }
 
-                const user = await this.userService.save(userData, session);
+                const user = await this.userService.save(userData, transaction);
+                console.log(user)
 
                 const passwordData = {
                     password: body.password,
                     email: user.email,
-                    user: user._id
+                    user_id: user.id!
                 }
-                await this.passwordService.save(passwordData, session);
+                await this.passwordService.save(passwordData, transaction);
 
-                const otp = await this.otpService.generateOTP(user._id, OTP_TYPES.EMAIL_VERIFICATION, session);
+                const otp = await this.otpService.generateOTP(user.id!, OTP_TYPES.EMAIL_VERIFICATION, transaction);
                 await this.userService.sendActivationOTP(user, otp);
 
                 const response = {
                     message: this.successResponseMessage.ACTIVATION_CODE_SENT,
-                    user: user._id
+                    user: user.id
                 }
 
-                this.sendSuccessResponse(res, response, session, 201);
+                this.sendSuccessResponse(res, response, transaction, 201);
             } catch (error: any) {
-                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, session);
+                console.log(error.message)
+                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, transaction);
             }
         });
     }
@@ -80,12 +90,12 @@ class AuthController extends BaseApiController {
 
                 const user = await this.requestService.getLoggedInUser();
 
-                const otp = await this.otpService.generateOTP(user._id, OTP_TYPES.EMAIL_VERIFICATION);
+                const otp = await this.otpService.generateOTP(user.id!, OTP_TYPES.EMAIL_VERIFICATION);
                 await this.userService.sendActivationOTP(user, otp);
 
                 const response = {
                     message: this.successResponseMessage.ACTIVATION_CODE_SENT,
-                    user: user._id
+                    user: user.id
                 }
                 this.sendSuccessResponse(res, response);
             } catch (error: any) {
@@ -100,15 +110,20 @@ class AuthController extends BaseApiController {
             try {
                 const user = this.requestService.getLoggedInUser();
 
-                await this.userService.updateById(user._id, {status: USER_STATUS.ACTIVE});
+                const query = {
+                    condition: "id=$1",
+                    values: [user.id]
+                };
+                await this.userService.updateOne(query, {status: USER_STATUS.ACTIVE});
 
                 const loginSessionData = {
-                    user: user._id,
-                    status: BIT.ON
+                    user_id: user.id!,
+                    status: BIT.ON,
+                    validity_end_date: new Date(Date.now() + LOGIN_SESSION_VALIDITY)
                 };
         
                 const loginSession = await this.loginSessionService.save(loginSessionData);
-                const token = this.appUtils.createAuthToken(user._id, loginSession._id);
+                const token = this.appUtils.createAuthToken(user.id!, loginSession.id!);
 
                 const response = {
                     message: this.successResponseMessage.ACCOUNT_ACTIVATION_SUCCESSFUL,
@@ -134,10 +149,10 @@ class AuthController extends BaseApiController {
             try {
                 
                 const user = this.requestService.getLoggedInUser();
-                const otp = await this.otpService.generateOTP(user._id, OTP_TYPES.LOGIN);
+                const otp = await this.otpService.generateOTP(user.id!, OTP_TYPES.LOGIN);
                 await this.userService.sendLoginOTP(user, otp);
 
-                this.sendSuccessResponse(res, {user: user._id, otp});
+                this.sendSuccessResponse(res, {user: user.id, otp});
             } catch (error:any) {
                 this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_LOGIN, 500);
             }
@@ -155,12 +170,13 @@ class AuthController extends BaseApiController {
 
             try {
                 const loginSessionData = {
-                    user: user._id,
-                    status: BIT.ON
+                    user_id: user.id!,
+                    status: BIT.ON,
+                    validity_end_date: new Date(Date.now() + LOGIN_SESSION_VALIDITY)
                 };
         
                 const loginSession = await this.loginSessionService.save(loginSessionData);
-                const token = this.appUtils.createAuthToken(user._id, loginSession._id);
+                const token = this.appUtils.createAuthToken(user.id!, loginSession.id!);
 
 
                 const response = {
@@ -179,16 +195,16 @@ class AuthController extends BaseApiController {
         this.router.post(path, this.userMiddleWare.loadUserByResetEmail);
         this.router.post(path, async (req, res) => {
 
-            const session = await this.appUtils.createMongooseTransaction();
+            const transaction = await this.appUtils.startDbTransaction();
             try {
                 const user = this.requestService.getLoggedInUser();
 
-                const otp = await this.otpService.generateOTP(user._id, OTP_TYPES.PASSWORD_RESET);
+                const otp = await this.otpService.generateOTP(user.id!, OTP_TYPES.PASSWORD_RESET, transaction);
                 await this.userService.sendPasswordResetOTP(user, otp);
 
-                this.sendSuccessResponse(res, {}, session);
+                this.sendSuccessResponse(res, {}, transaction);
             } catch (error: any) {
-                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, session);
+                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, transaction);
             }
         });
     }
@@ -199,24 +215,29 @@ class AuthController extends BaseApiController {
         this.router.patch(path, this.userMiddleWare.hashNewPassword);
 
         this.router.patch(path, async (req, res, next) => {
-            const session = await this.appUtils.createMongooseTransaction();
+            const transaction = await this.appUtils.startDbTransaction();
             try {
                 const user = this.requestService.getLoggedInUser();
-                const previousPassword = this.requestService.getDataFromState(USER_PASSWORD_LABEL);
+                const previousPassword:UserPassword = this.requestService.getDataFromState(USER_PASSWORD_LABEL);
 
                 const password = {
                     password: req.body.password,
                     email: user.email,
-                    user: user._id
+                    user_id: user.id!
                 }
-                await this.passwordService.save(password, session);
-                //Deactivate old password
-                await this.passwordService.updateById(previousPassword._id, {status: PASSWORD_STATUS.DEACTIVATED});
+                await this.passwordService.save(password, transaction);
 
-                await session.commitTransaction();
+                //Deactivate old password
+                const query = {
+                    condition: "id=$1",
+                    values: [previousPassword.id]
+                }
+                await this.passwordService.updateOne(query, {status: PASSWORD_STATUS.DEACTIVATED});
+
+                await this.appUtils.commitDbTransaction(transaction);
                 next()
             } catch (error: any) {
-                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, session);
+                this.sendErrorResponse(res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500, transaction);
             }
         });
 
@@ -226,11 +247,12 @@ class AuthController extends BaseApiController {
                 const user = this.requestService.getLoggedInUser();
     
                 const loginSessionData = {
-                    user: user._id,
-                    status: BIT.ON
+                    user_id: user.id!,
+                    status: BIT.ON,
+                    validity_end_date: new Date(Date.now() + LOGIN_SESSION_VALIDITY)
                 };
                 const loginSession = await this.loginSessionService.save(loginSessionData);
-                const token = this.appUtils.createAuthToken(user._id, loginSession._id);
+                const token = this.appUtils.createAuthToken(user.id!, loginSession.id!);
                 
                 const response = {
                     message: this.successResponseMessage.PASSWORD_UPDATE_SUCCESSFUL,

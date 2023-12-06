@@ -1,3 +1,5 @@
+import Env from "./environment_config";
+
 const JoiValidatorOptions = {
     errors: {
       wrap: {
@@ -9,14 +11,14 @@ const JoiValidatorOptions = {
 };
 
 const DbConfig = {
-  host: 'localhost',
-  user: 'enyata-user',
-  password: 'password',
-  database: 'enyata-e-ecommerce',
-  max: 1,
+  host: Env.DB_HOST,
+  user: Env.DB_USER,
+  password: Env.DB_PASSWORD,
+  database: Env.DB_NAME,
+  port: Env.DB_PORT,
+  max: 2,
   idleTimeoutMillis: 50000,
-  connectionTimeoutMillis: 10000,
-  port: 5432
+  connectionTimeoutMillis: 10000
 };
 
 export {

@@ -1,5 +1,6 @@
-import { TransactionData, TransactionResult } from "../interfaces/interfaces";
-import { appInstance } from "../App";
+import { PoolClient } from "pg";
+import { IDbQuery, PopulateTables } from "../interfaces/interfaces";
+import pool from "../common/utils/db-pool";
 
 /**
  * An abstract class that provides methods for performing DB queries.
@@ -11,9 +12,9 @@ import { appInstance } from "../App";
  * @param T interface of the database model schema
 */
 
-abstract class DBService<T> {
 
-    client = appInstance?.dbClient;
+abstract class DBService<T> {
+    
     private readonly table_name:string;
 
     constructor(tableName:string) {
@@ -23,10 +24,12 @@ abstract class DBService<T> {
     /**
      * Performs an insert query for the provided data.
      * @param data data of type object to be saved
+     * @param transaction an optional db transaction
      * @returns  A promise resolving to the result of type T of the performed query
     */
-    public save(data: Record<string, number|boolean|string>): Promise<T> {
+    public save(data: Record<string, any>, transaction?: PoolClient): Promise<T> {
         return new Promise(async (resolve, reject) => {
+            const client = transaction || await pool.connect();
             try {
                 const fields = Object.keys(data).join();
                 const values = Object.values(data);
@@ -42,73 +45,57 @@ abstract class DBService<T> {
                     VALUES(${valueParams})
                     RETURNING *
                     `
-                const response = await this.client.query(queryText, values);
-                
+                console.log(queryText)
+                const response = await client.query(queryText, values);
                 resolve(response.rows[0]);
             } catch (error) {
                 reject (error);
             } finally {
-                this.client.release();
+                if (!transaction) client.release();
             }
         })
     }
 
     /**
-     * Performs insert queries for the provided data in a transaction.
-     * @param data data of type TransactionData to be saved
-     * @returns  A promise resolving to TransactionResult containing the result of the performed queries
-    */
-    public saveWithTransaction(data: TransactionData[]): Promise<TransactionResult[]> {
-
-        return new Promise(async (resolve, reject) => {
-            try {
-    
-                const response:TransactionResult[] = [];
-
-                await this.client.query('BEGIN')
-
-                for (const item of data) {
-                    const fields = Object.keys(item.data).join();
-                    const values = Object.values(item.data);
-                    let valueParams = "";
-                    values.forEach((value, i) => { 
-                        let num = "";
-                        num += i+1 == values.length ? i+1 + "" : i+1 + ",";
-                        valueParams += "$" + num;
-                    })
-
-                    const queryText = `
-                        INSERT INTO ${item.name}(${fields})
-                        VALUES(${valueParams})
-                        RETURNING *
-                        `
-                    const res = await this.client.query(queryText, values);
-
-                    response.push({
-                        name: item.name,
-                        data: res.rows[0]
-                    })
-                }
-
-                await this.client.query('COMMIT');
-                resolve(response);
-    
-            } catch (error) {
-                await this.client.query('ROLLBACK');
-                reject(error);
-            } finally {
-                this.client.release();
-            }
-        })
-    }
-
-        /**
-     * Performs an insert query for multiple values in the provided data.
+     * Performs an insert query for the provided data in a db transaction.
      * @param data data of type object to be saved
      * @returns  A promise resolving to the result of type T of the performed query
     */
-        public saveMany(data: Record<string, number|boolean|string>[]): Promise<T[]> {
+    // public saveWithTransaction(data: Record<string, number|boolean|string>, client: PoolClient): Promise<T> {
+    //     return new Promise(async (resolve, reject) => {
+    //         try {
+    //             const fields = Object.keys(data).join();
+    //             const values = Object.values(data);
+    //             let valueParams = "";
+    //             values.forEach((value, i) => { 
+    //                 let num = "";
+    //                 num += i+1 == values.length ? i+1 + "" : i+1 + ",";
+    //                 valueParams += "$" + num;
+    //             })
+
+    //             const queryText = `
+    //                 INSERT INTO ${this.table_name}(${fields})
+    //                 VALUES(${valueParams})
+    //                 RETURNING *
+    //                 `
+    //             const response = await client.query(queryText, values);
+                
+    //             resolve(response.rows[0]);
+    //         } catch (error) {
+    //             reject(error);
+    //         }
+    //     })
+    // }
+
+    /**
+     * Performs an insert query for multiple values in the provided data.
+     * @param data data of type object to be saved
+     * @param transaction an optional db transaction
+     * @returns  A promise resolving to the result of type T of the performed query
+    */
+        public saveMany(data: Record<string, any>[], transaction?: PoolClient): Promise<T[]> {
             return new Promise(async (resolve) => {
+                const client = transaction || await pool.connect();
                 try {
     
                     let fields;
@@ -148,13 +135,14 @@ abstract class DBService<T> {
                         VALUES ${valueParams}
                         RETURNING *
                         `
-                    const response = await this.client.query(queryText, inputs);
+                    console.log(queryText)
+                    const response = await client.query(queryText, inputs);
                     
                     resolve(response.rows);
                 } catch (error:any) {
                     resolve(error);
                 } finally {
-                    this.client.release();
+                    if (!transaction) client.release();
                 }
             })
         }
@@ -162,19 +150,23 @@ abstract class DBService<T> {
     /**
      * Fetches all data from the specified table, matching the provided filter
      * @param fields optional columns to be selected
-     * @param condition conditions to be applied to the WHERE part of the sql query
+     * @param query an object containing parametrized WHERE conditions and and an array of their corresponding values
+     * - condition conditions to be applied to the WHERE part of the sql query
+     * - values the corresponding values for the conditions
      * @param groupBy options to be applied to the GROUP_BY part of the sql query
      * @param having options to be applied to the HAVING part of the sql query
      * @param sort options to be applied to the ORDER_BY part of the sql query
      * @param pageSize options to be applied to the LIMIT part of the sql query
      * @param page options to be applied to the OFFSET part of the sql query
+     * @param transaction an optional db transaction
      * @returns  A promise resolving to a list of data of type T[] that matches the filter
     */
-    public find( condition = "", fields = "*", groupBy = "", having = "", sort = "", pageSize = 5, page = 1): Promise< T[] > {
+    public find( query:IDbQuery|undefined = undefined, fields = "*", groupBy = "", having = "", sort = "", pageSize = 5, page = 1, transaction?: PoolClient): Promise< T[] > {
         //@ts-ignore
         return new Promise(async (resolve, reject) => {
+            const client = transaction || await pool.connect();
             try {
-                const WHERE = condition ? "WHERE " + condition : "";
+                const WHERE = query?.condition ? "WHERE " + query.condition : "";
                 const GROUP_BY = groupBy ? "GROUP BY " + groupBy : "";
                 const HAVING = having ? "HAVING " + having : "";
                 const ORDER_BY = sort || "ORDER BY created_at DESC";
@@ -189,12 +181,13 @@ abstract class DBService<T> {
                     ${ORDER_BY}
                     ${LIMIT}
                 `
-                const response = await this.client.query(queryText);
+                console.log(queryText)
+                const response = await client.query(queryText, query?.values || []);
                 resolve(response.rows);
             } catch (error) {
                 reject(error);
             } finally {
-                this.client.release()
+                if(!transaction) client.release()
             }
         });
     }
@@ -202,20 +195,25 @@ abstract class DBService<T> {
     /**
      * Fetches a single row from table, matching the provided filter
      * @param fields optional columns to be selected
-     * @param condition conditions to be applied to the WHERE part of the sql query
+     * @param query an object containing parametrized WHERE conditions and and an array of their corresponding values
+     * - condition conditions to be applied to the WHERE part of the sql query
+     * - values the corresponding values for the conditions
      * @param groupBy options to be applied to the GROUP_BY part of the sql query
      * @param having options to be applied to the HAVING part of the sql query
      * @param sort options to be applied to the ORDER_BY part of the sql query
+     * @param transaction an optional db transaction
      * @returns  A promise resolving to  data of type T that matches the filter
     */
-    public findOne( condition = "", fields = "*", groupBy = "", having = "", sort = ""): Promise< T > {
+    public findOne( query:IDbQuery|undefined = undefined , fields = "*", groupBy = "", having = "", sort = "", transaction?:PoolClient): Promise< T > {
         //@ts-ignore
         return new Promise(async (resolve, reject) => {
+            
+            const client = transaction || await pool.connect();
             try {
-                const WHERE = condition ? "WHERE " + condition : "";
+                const WHERE = query?.condition ? "WHERE " + query.condition : "";
                 const GROUP_BY = groupBy ? "GROUP BY " + groupBy : "";
                 const HAVING = having ? "HAVING " + having : "";
-                const ORDER_BY = sort || "ORDER BY created_at DESC";
+                const ORDER_BY = sort || `ORDER BY ${this.table_name}.created_at DESC`;
                 
                 const queryText = `
                     SELECT ${fields}
@@ -225,12 +223,13 @@ abstract class DBService<T> {
                     ${HAVING}
                     ${ORDER_BY}
                 `
-                const response = await this.client.query(queryText);
+                console.log(queryText)
+                const response = await client.query(queryText, query?.values || []);
                 resolve(response.rows[0]);
             } catch (error) {
                 reject(error);
             } finally {
-                this.client.release()
+                if (!transaction) client.release()
             }
         });
     }
@@ -238,41 +237,47 @@ abstract class DBService<T> {
     /**
      * Fetches a single row from table, matching the provided id
      * @param fields optional columns to be selected
+     * @param transaction an optional db transaction
      * @returns  A promise resolving to  data of type T that matches the id
     */
-    public findById(id: number, fields = "*"): Promise< T > {
+    public findById(id: number, fields = "*", transaction?: PoolClient): Promise< T > {
         //@ts-ignore
         return new Promise(async (resolve, reject) => {
+            const client = transaction || await pool.connect();
             try {
-                
+
                 const queryText = `
                     SELECT ${fields}
                     FROM ${this.table_name}
                     WHERE id = $1
                 `
-                const response = await this.client.query(queryText, [id]);
+                console.log(queryText)
+                const response = await client.query(queryText, [id]);
                 resolve(response.rows[0]);
             } catch (error) {
                 reject(error);
             } finally {
-                this.client.release()
+                if(!transaction) client.release()
             }
         });
     }
 
     /**
      * Counts the number of rows that matches the provided filter
-     * @param fields optional columns to be selected
-     * @param condition conditions to be applied to the WHERE part of the sql query
+     * @param query an object containing parametrized WHERE conditions and and an array of their corresponding values
+     * - condition conditions to be applied to the WHERE part of the sql query
+     * - values the corresponding values for the conditions
      * @param groupBy options to be applied to the GROUP_BY part of the sql query
      * @param having options to be applied to the HAVING part of the sql query
+     * @param transaction an optional db transaction
      * @returns  A promise resolving to a list of data of type T[] that matches the filter
     */
-        public count( condition = "", fields = "*", column = "", groupBy = "", having = ""): Promise< number > {
+        public count( query:IDbQuery|undefined = undefined, column = "", groupBy = "", having = "", transaction?:PoolClient): Promise< number > {
             //@ts-ignore
             return new Promise(async (resolve, reject) => {
+                const client = transaction || await pool.connect();
                 try {
-                    const WHERE = condition ? "WHERE " + condition : "";
+                    const WHERE = query?.condition ? "WHERE " + query.condition : "";
                     const COUNT = column ? `COUNT (${column})` : 'COUNT (*)';
                     const GROUP_BY = groupBy ? "GROUP BY " + groupBy : "";
                     const HAVING = having ? "HAVING " + having : "";
@@ -285,12 +290,13 @@ abstract class DBService<T> {
                         ${GROUP_BY}
                         ${HAVING}
                     `
-                    const response = await this.client.query(queryText);
+                    console.log(queryText)
+                    const response = await client.query(queryText, query?.values || []);
                     resolve(response.rows[0]?.count);
                 } catch (error) {
                     reject(error);
                 } finally {
-                    this.client.release()
+                    if (!transaction) client.release()
                 }
             });
         }
@@ -298,19 +304,25 @@ abstract class DBService<T> {
     /**
      * Updates the specified columns in the rows from the specified table, matching the provided filter
      * @param data the update to be made
-     * @param condition conditions to be applied to the WHERE part of the sql query
+    * @param query an object containing parametrized WHERE conditions and and an array of their corresponding values
+     * - condition conditions to be applied to the WHERE part of the sql query
+     * - values the corresponding values for the conditions
+     * @param transaction an optional db transaction
      * @returns  A promise resolving to a list of data of type T[] that matches the filter
     */
-    public update(data: Record<string, number|boolean|string>, condition = ""): Promise< T[] > {
+    public update( query:IDbQuery|undefined = undefined, data: Record<string, any>, transaction?: PoolClient): Promise< T[] > {
         //@ts-ignore
         return new Promise(async (resolve, reject) => {
+            const client = transaction || await pool.connect();
             try {
-                const WHERE = "WHERE " + condition;
+                const WHERE = query?.condition ? "WHERE " + query.condition : "";
                 let valueParams = "";
-                let i = 1;
-                const values = Object.values(data);
+                let i = query?.values.length ? query.values.length + 1 : 1;
+                const firstParam = i;
+                const values = query?.values || [];
+                values.push(...Object.values(data));
                 for (const key in data) {
-                    const prefix =  i == 1 ? "" : ",";
+                    const prefix =  i == firstParam ? "" : ",";
                     valueParams += prefix + `${key} =` + "$" + i;
                     i++;
                 } 
@@ -321,12 +333,13 @@ abstract class DBService<T> {
                     ${WHERE}
                     RETURNING *
                 `
-                const response = await this.client.query(queryText, values);
+                console.log(queryText)
+                const response = await client.query(queryText, values);
                 resolve(response.rows);
             } catch (error) {
                 reject(error);
             } finally {
-                this.client.release()
+                if(!transaction) client.release()
             }
         });
     }
@@ -334,19 +347,26 @@ abstract class DBService<T> {
     /**
      * Updates the specified columns in the row from the specified table, matching the provided filter
      * @param data the update to be made
-     * @param condition conditions to be applied to the WHERE part of the sql query
+     * @param query an object containing parametrized WHERE conditions and and an array of their corresponding values
+     * - condition conditions to be applied to the WHERE part of the sql query
+     * - values the corresponding values for the conditions
+     * @param transaction an optional db transaction
      * @returns  A promise resolving to a list of data of type T that matches the filter
     */
-    public updateOne(data: Record<string, number|boolean|string>, condition = ""): Promise< T[] > {
+    public updateOne(query:IDbQuery|undefined = undefined, data: Record<string, any>, transaction?: PoolClient): Promise< T[] > {
         //@ts-ignore
         return new Promise(async (resolve, reject) => {
+            const client = transaction || await pool.connect();
             try {
-                const WHERE = "WHERE " + condition;
+                const WHERE = query?.condition ? "WHERE " + query.condition : "";
                 let valueParams = "";
-                let i = 1;
-                const values = Object.values(data);
+                let i = query?.values.length ? query.values.length + 1 : 1;
+                const firstParam = i;
+                const values = query?.values || [];
+                values.push(...Object.values(data));
+
                 for (const key in data) {
-                    const prefix =  i == 1 ? "" : ",";
+                    const prefix =  i == firstParam ? "" : ",";
                     valueParams += prefix + `${key} =` + "$" + i;
                     i++;
                 } 
@@ -357,12 +377,13 @@ abstract class DBService<T> {
                     ${WHERE}
                     RETURNING *
                 `
-                const response = await this.client.query(queryText, values);
+                console.log(queryText)
+                const response = await client.query(queryText, values);
                 resolve(response.rows[0]);
             } catch (error) {
                 reject(error);
             } finally {
-                this.client.release()
+                if(!transaction) client.release()
             }
         });
     }

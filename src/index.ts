@@ -1,18 +1,17 @@
-import App, {appInstance} from "./App";
 import {ENVIRONMENTS } from './common/constants/app_constants';
 import Env from './common/configs/environment_config';
-import { DbConfig } from './common/configs/app_config';
-import { Pool } from 'pg';
 import AppUtils from "./common/utils/AppUtils";
+import pool from "./common/utils/db-pool";
+import App from './App';
+import UserService from './services/UserService';
 
 //Initiate DB connection
-const pool = new Pool(DbConfig);
 pool.connect().then(async client => {
-  console.log("Connected to DB");
-  appInstance.setDbClient(client);
-
   const appUtils = new AppUtils();
   await appUtils.createDbTables(client);
+
+  const userService = new UserService();
+  userService.createDefaultAdmin();
 
   App.listen(Env.PORT, () => {
     if (Env.ENVIRONMENT == ENVIRONMENTS.DEV) console.log(`Express is listening at http://localhost:${Env.PORT}${Env.API_PATH}`);
@@ -20,6 +19,7 @@ pool.connect().then(async client => {
 }).catch(error => {
   console.log(error)
 });
+  
 
 
 process.on('unhandledRejection', (reason: string, p: Promise<any>) => {

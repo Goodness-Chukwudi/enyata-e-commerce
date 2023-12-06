@@ -2,10 +2,10 @@ import AppUtils from "../common/utils/AppUtils";
 import BaseRouterMiddleware from "./BaseRouterMiddleware";
 import { USER_STATUS, USER_LABEL, BIT, USER_PASSWORD_LABEL, PASSWORD_STATUS } from '../common/constants/app_constants';
 import { NextFunction, Request, Response, Router } from 'express';
-import UserService from "../services/UserService";
 import LoginSessionService from "../services/LoginSessionService";
 import PasswordService from "../services/PasswordService";
 import OtpService from "../services/OtpService";
+import { user_table } from "../models/user";
 
 class UserMiddleware extends BaseRouterMiddleware {
 
@@ -19,11 +19,11 @@ class UserMiddleware extends BaseRouterMiddleware {
     }
 
     protected initServices() {
+
         this.appUtils = new AppUtils();
-        this.userService = new UserService();
         this.loginSessionService = new LoginSessionService();
         this.otpService = new OtpService();
-        this.passwordService = new PasswordService(["user"]);
+        this.passwordService = new PasswordService();
 
     }
 
@@ -31,58 +31,74 @@ class UserMiddleware extends BaseRouterMiddleware {
      * A middleware that fetches a user from the db using the email provided in the request.
      * - The fetched user is available through the getDataFromState or getLoggedInUser method of the request service
     */
-    public loadUserToRequestByEmail = (req: Request, res: Response, next: NextFunction) => {
-        const email = req.body.email;
+    public loadUserToRequestByEmail = async (req: Request, res: Response, next: NextFunction) => {
 
-        if (!email) {
-            const error = new Error("email is required");
-            return this.sendErrorResponse(res, error, this.errorResponseMessage.requiredField("Email"), 400);
+        try {
+            const email = req.body.email;
+    
+            if (!email) {
+                const error = new Error("email is required");
+                return this.sendErrorResponse(res, error, this.errorResponseMessage.requiredField("Email"), 400);
+            }
+    
+            const query = {
+                condition: "email=$1 AND status=$2",
+                values: [email, PASSWORD_STATUS.ACTIVE]
+            };
+                        
+            const password = await this.passwordService.findOne(query);
+            if (!password) return this.sendErrorResponse(res, new Error("User not found"), this.errorResponseMessage.INVALID_LOGIN, 400)
+    
+            //@ts-ignore
+            const user = await this.userService.findById(password.user_id);
+            this.requestService.addDataToState(USER_LABEL, user);
+            this.requestService.addDataToState(USER_PASSWORD_LABEL, password);
+            next();
+        } catch (error:any) {
+            return this.sendErrorResponse( res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500 );
         }
-
-        this.passwordService.findOneAndPopulate({email: email, status: PASSWORD_STATUS.ACTIVE})
-            .then((password) => {
-                if (!password) return this.sendErrorResponse(res, new Error("User not found"), this.errorResponseMessage.INVALID_LOGIN, 400)
-
-                this.requestService.addDataToState(USER_LABEL, password.user);
-                this.requestService.addDataToState(USER_PASSWORD_LABEL, password);
-                next();
-            })
-            .catch((err) => {
-                return this.sendErrorResponse( res, err, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500 );
-            })
     }
 
     /**
      * A middleware that fetches a user from the db using the email provided in the request.
      * - The fetched user is available through the getDataFromState or getLoggedInUser method of the request service
     */
-    public loadUserByResetEmail = (req: Request, res: Response, next: NextFunction) => {
-        const email = req.body.email;
+    public loadUserByResetEmail = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const email = req.body.email;
+    
+            if (!email) {
+                const error = new Error("email is required");
+                return this.sendErrorResponse(res, error, this.errorResponseMessage.requiredField("Email"), 400)
+            }
+    
+            const emailRegex = new RegExp(/^([a-z0-9]+(?:[._-][a-z0-9]+)*)@([a-z0-9]+(?:[.-][a-z0-9]+)*\.[a-z]{2,})$/, "i");
+            if (!emailRegex.test(email)) {
+                const error = new Error("Invalid email format");
+                return this.sendErrorResponse(res, error, this.errorResponseMessage.INVALID_EMAIL, 400);
+            }
+    
+            const query = {
+                condition: "user_passwords.email=$1",
+                values: [email]
+            };
 
-        if (!email) {
-            const error = new Error("email is required");
-            return this.sendErrorResponse(res, error, this.errorResponseMessage.requiredField("Email"), 400)
+            const password = await this.passwordService.findOne(query);
+            if (!password) {
+                return this.sendErrorResponse(res, new Error("User not found"), this.errorResponseMessage.resourceNotFound("User"), 400)
+            }
+            //@ts-ignore
+            const user = await this.userService.findById(password.user_id)
+            this.requestService.addDataToState(USER_LABEL, user);
+            this.requestService.addDataToState(USER_PASSWORD_LABEL, password);
+        
+            req.body.user_id = user.id;
+            next();
+            
+        } catch (error: any) {
+            return this.sendErrorResponse( res, error, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500 );
+            
         }
-
-        const emailRegex = new RegExp(/^([a-z0-9]+(?:[._-][a-z0-9]+)*)@([a-z0-9]+(?:[.-][a-z0-9]+)*\.[a-z]{2,})$/, "i");
-        if (!emailRegex.test(email)) {
-            const error = new Error("Invalid email format");
-            return this.sendErrorResponse(res, error, this.errorResponseMessage.INVALID_EMAIL, 400);
-        }
-
-        this.passwordService.findOneAndPopulate({email: email})
-            .then((password) => {
-                if (!password) {
-                    return this.sendErrorResponse(res, new Error("User not found"), this.errorResponseMessage.resourceNotFound("User"), 400)
-                }
-                this.requestService.addDataToState(USER_LABEL, password.user);
-                this.requestService.addDataToState(USER_PASSWORD_LABEL, password);
-                req.body.user_id = password.user._id;
-                next();
-            })
-            .catch((err) => {
-                return this.sendErrorResponse( res, err, this.errorResponseMessage.UNABLE_TO_COMPLETE_REQUEST, 500 );
-            })
     }
 
     /**
@@ -90,7 +106,7 @@ class UserMiddleware extends BaseRouterMiddleware {
      * - Returns the appropriate error response for users with invalid status
     */
     public checkUserStatus = (req: Request, res: Response, next: NextFunction) => {
-        const user: any = this.requestService.getDataFromState(USER_LABEL);
+        const user = this.requestService.getLoggedInUser();
         const status = user.status;
 
         switch(status) {
@@ -144,23 +160,24 @@ class UserMiddleware extends BaseRouterMiddleware {
 
     }
 
-    public validateOTP = async (req: Request, res: Response, next: any)=> {
+    public validateOTP = async (req: Request, res: Response, next: any) => {
         const otp = req.body.otp;
         const userId = req.body.user_id;
         try {
             if (otp) {
-                const user = await this.userService.findByIdAndPopulate(userId);
+                const user = await this.userService.findById(userId);
                 if (!user) {
                     const error = new Error("Invalid user id provided");
-                    return this.sendErrorResponse(res, error, this.errorResponseMessage.requiredField("A valid user id"), 400);
+                    return this.sendErrorResponse(res, error, this.errorResponseMessage.INVALID_OTP, 400);
                 }
-                
+                console.log("BEFORE VALID")
                 const isValid = await this.otpService.validateOTP(userId, otp);
                 if (isValid) {
                     this.requestService.addDataToState(USER_LABEL, user);
                     return next();
                 }
             }
+
             const error = new Error("Invalid or expired otp");
             return this.sendErrorResponse(res, error, this.errorResponseMessage.INVALID_OTP, 400);
         } catch (error:any) {
@@ -176,8 +193,13 @@ class UserMiddleware extends BaseRouterMiddleware {
     public validatePassword = async (req: Request, res: Response, next: any) => {
         try {
             const user = this.requestService.getLoggedInUser();
-            const userPassword = await this.passwordService.findOne({user: user._id});
 
+            const query = {
+                condition: "user_id=$1",
+                values: [user.id]
+            };
+    
+            const userPassword = await this.passwordService.findOne(query);
             const isCorrectPassword = await this.appUtils.validateHashedData(req.body.password, userPassword.password);
             if (!isCorrectPassword) return this.sendErrorResponse(res, new Error("Wrong password"), this.errorResponseMessage.INVALID_LOGIN, 400);
 
@@ -196,16 +218,24 @@ class UserMiddleware extends BaseRouterMiddleware {
     public logoutExistingSession = async (req: Request, res: Response, next: any) => {
         const user = this.requestService.getLoggedInUser();
         try {
-            const activeLoginSession = await this.loginSessionService.findOne({status: BIT.ON, user: user._id})
+            const query = {
+                condition: "status=$1 AND user_id=$2",
+                values: [BIT.ON, user.id]
+            };
+            const activeLoginSession = await this.loginSessionService.findOne(query);
+
+            const update:Record<string, any> = {};
+
             if(activeLoginSession) {
                 if (activeLoginSession.validity_end_date > new Date()) {
-                    activeLoginSession.logged_out = true;
-                    activeLoginSession.validity_end_date = new Date();
+                    update.logged_out = true;
+                    update.validity_end_date = new Date();
                 } else {
-                    activeLoginSession.expired = true
+                    update.expired = true
                 }
-                activeLoginSession.status = BIT.OFF;
-                await activeLoginSession.save();
+                update.status = BIT.OFF;
+
+                await this.loginSessionService.updateOne(query, update);
             }
             next();
 
@@ -226,8 +256,11 @@ class UserMiddleware extends BaseRouterMiddleware {
             const error =  new Error("Invalid email address");
             return this.sendErrorResponse(res, error, this.errorResponseMessage.INVALID_EMAIL, 400);
         }
-
-        this.userService.findOne({email: email})
+        const query = {
+            condition: "email=$1",
+            values: [email]
+        };
+        this.userService.findOne(query)
             .then((user) => {
                 if (user) {
                     const error = new Error("Email already exists");
@@ -246,8 +279,12 @@ class UserMiddleware extends BaseRouterMiddleware {
             const error = new Error("Phone number is required");
             return this.sendErrorResponse(res, error, this.errorResponseMessage.requiredField("Phone"), 400);
         }
+        const query = {
+            condition: "phone=$1",
+            values: [phone]
+        };
 
-        this.userService.findOne({phone: phone})
+        this.userService.findOne(query)
             .then((user) => {
                 if (user) {
                     const error = new Error("Phone number already exists");

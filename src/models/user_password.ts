@@ -1,13 +1,14 @@
+import User from "./user";
 
  interface UserPassword {
+    id?: number,
     password: string,
     email: string,
-    user_id: number,
+    user_id: number|User,
     status: string,
-    id: number,
     created_at: Date
 }
 
-export const user_password_table = "user_password";
+export const user_password_table = "user_passwords";
 
 export default UserPassword;

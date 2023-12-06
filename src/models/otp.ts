@@ -1,12 +1,13 @@
+import User from "./user";
 
 interface OTP {
-    id?: string,
+    id?: number,
     code: string,
     type: string,
-    user_id: number,
+    user_id: number|User,
     status: string,
     created_at: Date
 }
 
-export const otp_table = "otp";
+export const otp_table = "otps";
 export default OTP;

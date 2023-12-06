@@ -3,7 +3,6 @@ import bcrypt from 'bcryptjs';
 import Jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from 'uuid';
 import { Request } from 'express';
-import mongoose, { ClientSession } from 'mongoose';
 import BaseResponseHandler from '../../controllers/base controllers/BaseResponseHandlerController';
 import { ENVIRONMENTS } from '../constants/app_constants';
 import Env from '../configs/environment_config';
@@ -11,6 +10,7 @@ import {UploadApiResponse, v2 as cloudinary} from 'cloudinary';
 import Jimp from "jimp";
 import table_create_queries from '../configs/db_table_create_queries';
 import { PoolClient } from 'pg';
+import pool from './db-pool';
 
 class AppUtils extends BaseResponseHandler {
 
@@ -107,7 +107,7 @@ class AppUtils extends BaseResponseHandler {
      * @param loginSession the login session of type ILoginSession, created for a user's login
      * @returns an alphanumeric string of the specified length
     */
-    public createAuthToken(userId: string, loginSessionId: string): string {
+    public createAuthToken(userId:number, loginSessionId:number): string {
         try {
 
             const data: any = {user: userId, loginSession: loginSessionId};
@@ -148,6 +148,19 @@ class AppUtils extends BaseResponseHandler {
             }
         });       
     }
+
+        /**
+     * Generates a default password
+     * @returns a string
+    */
+        createDefaultPassword(): string {
+            try {
+                return (Env.ENVIRONMENT === ENVIRONMENTS.DEV)? "password" : this.getCode(8);
+                
+            } catch (error) {
+                throw error;
+            }
+        }
 
     /**
      * Compares and validates the equality of a value with a hashed data
@@ -250,24 +263,46 @@ class AppUtils extends BaseResponseHandler {
     }
 
     /**
-     * Creates a mongoose database transaction
-     * @returns  a promise that resolves to a mongoose ClientSession
+     * Creates a  database transaction
+     * @returns  a promise that resolves to a db pool client
     */
-    createMongooseTransaction(): Promise<ClientSession> {
-        return new Promise((resolve, reject) => {
-            let session: ClientSession;
-            mongoose.startSession()
-                .then(_session => {
-                    session = _session;
-                    session.startTransaction();
-                })
-                .then(() => {
-                    resolve(session);
-                })
-                .catch((error) => {
-                    reject(error);
-                });
-        });
+    startDbTransaction(): Promise<PoolClient>{
+        return new Promise(async (resolve, reject) => {
+            try {
+                const client = await pool.connect();
+    
+                await client.query('BEGIN');
+                resolve(client)
+            } catch (error) {
+                reject(error);
+            }
+        })
+    }
+
+    /**
+     * Commits a database transaction
+     * @returns  a promise that resolves to void
+    */
+    async commitDbTransaction(client: PoolClient): Promise<void>{
+        try {
+            await client.query('COMMIT');
+            client.release();
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    /**
+     * Rolls back a database transaction
+     * @returns  a promise that resolves to void
+    */
+    async rollBackDbTransaction(client: PoolClient): Promise<void>{
+        try {
+            await client.query('ROLLBACK');
+            client.release();
+        } catch (error) {
+            throw error;
+        }
     }
 
     /**

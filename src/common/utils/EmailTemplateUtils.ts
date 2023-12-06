@@ -23,7 +23,7 @@ class EmailTemplateUtils {
         return `
 
             <body>
-                <div>Dear ${name}, welcome to fuuti!. Use the otp below to complete your sign up</div>
+                <div>Dear ${name}, welcome to Enyeta!. Use the otp below to complete your sign up</div>
 
                 <bold>${otp}</bold>
             </body>

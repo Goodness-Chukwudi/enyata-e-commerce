@@ -1,8 +1,4 @@
 import joi, { Extension, Root } from "joi";
-import { IUser } from "../models/user";
-import { ILoginSession } from "../models/login_session";
-import { IUserPrivilege } from "../models/user_privilege";
-import { QueryResult } from "pg";
 
 export interface IResponseMessage {
     response_code: number;
@@ -16,20 +12,19 @@ export interface TransactionData {
     data: Record<string, string|boolean|number>
 }
 
-export interface TransactionResult {
-    name: string,
-    data: Record<string, any>
-}
-
 export interface IServiceResponse {
     data: any,
     error: IServiceError|undefined
 }
 
-export interface ICachedRequestData {
-    user: IUser,
-    loginSession: ILoginSession,
-    privileges: [IUserPrivilege]
+export interface IDbQuery {
+    condition: string,
+    values: any[]
+}
+
+export interface PopulateTables {
+    name: string,
+    condition: string
 }
 
 interface IServiceError {
