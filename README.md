@@ -22,12 +22,14 @@ Below is a list of the variables needed in your .env file
     JWT_EXPIRY
     SENDGRID_SENDER_EMAIL
     SENDGRID_API_KEY
+    
     SUPER_ADMIN_FIRST_NAME
     SUPER_ADMIN_MIDDLE_NAME
     SUPER_ADMIN_LAST_NAME
     SUPER_ADMIN_EMAIL
     SUPER_ADMIN_PHONE
     SUPER_ADMIN_GENDER
+    
     DB_HOST
     DB_USER
     DB_PASSWORD
